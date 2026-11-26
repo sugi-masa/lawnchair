@@ -77,6 +77,7 @@ class FolderHomeView @JvmOverloads constructor(
                 downY = event.y
                 swipeTriggered = false
             }
+
             MotionEvent.ACTION_MOVE -> {
                 if (!swipeTriggered) {
                     val dy = event.y - downY
@@ -87,6 +88,7 @@ class FolderHomeView @JvmOverloads constructor(
                     }
                 }
             }
+
             MotionEvent.ACTION_CANCEL -> swipeTriggered = false
         }
         // Consume everything so touches never leak to the workspace below.
