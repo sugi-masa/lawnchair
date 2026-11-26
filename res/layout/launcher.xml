@@ -73,6 +73,13 @@
             android:id="@+id/overview_panel"
             layout="@layout/overview_panel" />
 
+        <!-- Folder home layer: above the workspace, below All Apps. Its visibility is
+             driven by FolderHomeTransitionController based on the launcher state. -->
+        <app.lawnchair.folderhome.FolderHomeView
+            android:id="@+id/folder_home_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
         <include
             android:id="@+id/apps_view"
             layout="@layout/all_apps"
