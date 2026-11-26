@@ -32,6 +32,7 @@ import static com.android.app.animation.Interpolators.OVERSHOOT_0_75;
 import static com.android.app.animation.Interpolators.OVERSHOOT_1_2;
 import static com.android.app.animation.Interpolators.clampToProgress;
 import static com.android.launcher3.LauncherState.ALL_APPS;
+import static com.android.launcher3.LauncherState.FOLDER_HOME;
 import static com.android.launcher3.LauncherState.HINT_STATE;
 import static com.android.launcher3.LauncherState.HINT_STATE_TWO_BUTTON;
 import static com.android.launcher3.LauncherState.NORMAL;
@@ -48,6 +49,7 @@ import static com.android.launcher3.states.StateAnimationConfig.ANIM_OVERVIEW_SP
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_OVERVIEW_TRANSLATE_X;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_OVERVIEW_TRANSLATE_Y;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_SCRIM_FADE;
+import static com.android.launcher3.states.StateAnimationConfig.ANIM_VERTICAL_PROGRESS;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_WORKSPACE_FADE;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_WORKSPACE_SCALE;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_WORKSPACE_TRANSLATE;
@@ -226,6 +228,9 @@ public class QuickstepAtomicAnimationFactory extends
             config.setInterpolator(ANIM_OVERVIEW_ACTIONS_FADE, clampToProgress(LINEAR,
                     timings.getActionsFadeStartOffset(),
                     timings.getActionsFadeEndOffset()));
+        } else if (fromState == FOLDER_HOME || toState == FOLDER_HOME) {
+            // The folder home layer is driven by a single vertical progress, like All Apps.
+            config.setInterpolator(ANIM_VERTICAL_PROGRESS, DECELERATE_1_7);
         } else if ((fromState == NORMAL || fromState == ALL_APPS)
                 && toState == OVERVIEW_SPLIT_SELECT) {
             // Splitting from Home is currently only available on tablets
