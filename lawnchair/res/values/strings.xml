@@ -1098,4 +1098,7 @@
     <string name="lawnchair_action_failed">Failed to trigger action</string>
 
     <string name="please_wait">Please wait…</string>
+
+    <string name="folder_home_title">Folder Home</string>
+    <string name="folder_home_swipe_down_hint">Swipe down to go to the home screen</string>
 </resources>
