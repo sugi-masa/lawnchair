@@ -65,6 +65,7 @@ import static com.android.launcher3.LauncherState.ALL_APPS;
 import static com.android.launcher3.LauncherState.EDIT_MODE;
 import static com.android.launcher3.LauncherState.FLAG_MULTI_PAGE;
 import static com.android.launcher3.LauncherState.FLAG_NON_INTERACTIVE;
+import static com.android.launcher3.LauncherState.FOLDER_HOME;
 import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.LauncherState.NO_OFFSET;
 import static com.android.launcher3.LauncherState.NO_SCALE;
@@ -255,6 +256,8 @@ import com.android.launcher3.util.WallpaperThemeManager;
 import com.android.launcher3.views.FloatingIconView;
 import com.android.launcher3.views.FloatingSurfaceView;
 import com.android.launcher3.views.OptionsPopupView;
+import app.lawnchair.folderhome.FolderHomeTransitionController;
+import app.lawnchair.folderhome.FolderHomeView;
 import app.lawnchair.views.EditModePageStrip;
 import com.android.launcher3.views.ScrimView;
 import com.android.launcher3.widget.LauncherAppWidgetHostView;
@@ -359,6 +362,11 @@ public class Launcher extends StatefulActivity<LauncherState>
     @Thunk
     public ActivityAllAppsContainerView<Launcher> mAppsView;
     AllAppsTransitionController mAllAppsController;
+
+    // Main container view for the folder home layer.
+    @Thunk
+    FolderHomeView mFolderHomeView;
+    FolderHomeTransitionController mFolderHomeController;
     // Views that should be blurred when All Apps is open or depth is otherwise applied.
     private List<View> mDepthBlurTargets;
 
@@ -461,6 +469,7 @@ public class Launcher extends StatefulActivity<LauncherState>
 
         initDragController();
         mAllAppsController = new AllAppsTransitionController(this);
+        mFolderHomeController = new FolderHomeTransitionController(this);
         mStateManager = new StateManager<>(this, NORMAL);
 
         mAppWidgetManager = new WidgetManagerHelper(this);
@@ -1364,6 +1373,10 @@ public class Launcher extends StatefulActivity<LauncherState>
         mDropTargetBar.setup(mDragController);
         mAllAppsController.setupViews(mScrimView, mAppsView);
 
+        // Setup Folder Home
+        mFolderHomeView = findViewById(R.id.folder_home_view);
+        mFolderHomeController.setupViews(mFolderHomeView);
+
         mWorkspace.getPageIndicator().setShouldAutoHide(true);
         mWorkspace.getPageIndicator().setPaintColor(Themes.getAttrBoolean(
                 this, R.attr.isWorkspaceDarkText) ? Color.BLACK : Color.WHITE);
@@ -1627,14 +1640,16 @@ public class Launcher extends StatefulActivity<LauncherState>
                 AbstractFloatingView.closeAllOpenViewsExcept(this, isStarted(), excludedViews);
 
 
-                if (!isInState(NORMAL)) {
+                if (!isInState(FOLDER_HOME)) {
                     // Only change state, if not already the same. This prevents cancelling any
-                    // animations running as part of resume
+                    // animations running as part of resume.
+                    // The home intent returns to the folder home layer, which sits on top
+                    // of the normal home (NORMAL) state.
                     boolean animate = mStateManager.shouldAnimateStateChange();
                     if (!LawnchairApp.isRecentsEnabled()) {
                         animate &= alreadyOnHome;
                     }
-                    mStateManager.goToState(NORMAL, animate);
+                    mStateManager.goToState(FOLDER_HOME, animate);
                 }
 
                 // Reset the apps view
@@ -2651,6 +2666,7 @@ public class Launcher extends StatefulActivity<LauncherState>
     @Override
      public void collectStateHandlers(List<StateHandler<LauncherState>> out) {
         out.add(getAllAppsController());
+        out.add(getFolderHomeController());
         out.add(getWorkspace());
     }
 
@@ -2893,6 +2909,14 @@ public class Launcher extends StatefulActivity<LauncherState>
 
     public AllAppsTransitionController getAllAppsController() {
         return mAllAppsController;
+    }
+
+    public FolderHomeTransitionController getFolderHomeController() {
+        return mFolderHomeController;
+    }
+
+    public FolderHomeView getFolderHomeView() {
+        return mFolderHomeView;
     }
 
     @Override
