@@ -252,6 +252,11 @@ class LawnchairLauncher : QuickstepLauncher() {
         reloadIconsIfNeeded()
 
         AppDatabase.INSTANCE.get(this).checkpointSync()
+
+        // Folder home is the top layer shown when the launcher starts. The state
+        // manager itself keeps NORMAL as its base state; we move to FOLDER_HOME
+        // without animation once everything is set up.
+        stateManager.goToState(LauncherState.FOLDER_HOME, false)
     }
 
     override fun onNewIntent(intent: Intent?) {
