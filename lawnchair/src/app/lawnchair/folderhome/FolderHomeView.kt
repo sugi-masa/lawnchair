@@ -1,5 +1,8 @@
 package app.lawnchair.folderhome
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
@@ -12,29 +15,28 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.animation.PathInterpolator
 import android.widget.FrameLayout
 import android.widget.GridLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import com.android.launcher3.Launcher
 import com.android.launcher3.LauncherAppState
 import com.android.launcher3.LauncherSettings.Favorites.CONTAINER_DESKTOP
 import com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT
 import com.android.launcher3.R
-import com.android.launcher3.folder.FolderIcon
 import com.android.launcher3.model.BgDataModel
 import com.android.launcher3.model.data.FolderInfo
 import com.android.launcher3.model.data.ItemInfo
 import com.android.launcher3.model.data.ItemInfoWithIcon
 import com.android.launcher3.model.data.WorkspaceData
-import com.android.launcher3.touch.ItemClickHandler
 import com.android.launcher3.util.Executors
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.function.Predicate
+import kotlin.math.abs
 
 /**
  * Full-screen layer for the Folder Home state: the space hub, and the only home
@@ -47,8 +49,13 @@ import java.util.function.Predicate
  *
  * There is no gesture out of the hub into the workspace: swiping up opens All
  * Apps through the launcher's own All Apps swipe controller, and everything
- * else returns here. Card taps open the stock folder popup for now; a later
- * unit replaces that with paged folder pages.
+ * else returns here.
+ *
+ * Tapping a card cross-zooms to the folder layer ([FolderPagesView]), which
+ * pages through the same folders one per page. The launcher state stays
+ * FOLDER_HOME throughout; the two layers are modes of this view, switched by
+ * [openFolder] and [closeFolderPage], and the system back action is routed
+ * back here by a back-press handler registered by the launcher.
  */
 class FolderHomeView @JvmOverloads constructor(
     context: Context,
@@ -65,9 +72,16 @@ class FolderHomeView @JvmOverloads constructor(
     private val prevPageButton = TextView(context)
     private val nextPageButton = TextView(context)
 
-    private var folderInfosById: Map<Int, FolderInfo> = emptyMap()
+    private lateinit var hubRoot: LinearLayout
+    private val folderPages = FolderPagesView(context)
+
+    private var currentEntries: List<FolderEntry> = emptyList()
     private var totalFolders = 0
     private var refreshQueued = false
+
+    private var openFolderId = NO_FOLDER_ID
+    private var layerFraction = 0f
+    private var layerAnimator: ValueAnimator? = null
 
     private val clockHandler = Handler(Looper.getMainLooper())
     private val clockTicker = object : Runnable {
@@ -101,7 +115,7 @@ class FolderHomeView @JvmOverloads constructor(
         setBackgroundColor(BACKGROUND_COLOR)
         contentDescription = context.getString(R.string.folder_home_title)
 
-        val root = LinearLayout(context).apply {
+        hubRoot = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(
                 dp(HORIZONTAL_PADDING_DP),
@@ -180,7 +194,7 @@ class FolderHomeView @JvmOverloads constructor(
                 topMargin = dp(HEADER_MARGIN_TOP_DP)
             },
         )
-        root.addView(
+        hubRoot.addView(
             widgetZone,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -281,7 +295,7 @@ class FolderHomeView @JvmOverloads constructor(
                 topMargin = dp(HEADER_MARGIN_TOP_DP)
             },
         )
-        root.addView(
+        hubRoot.addView(
             folderSection,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -296,7 +310,16 @@ class FolderHomeView @JvmOverloads constructor(
         updateHubHeader()
         updateClock()
 
-        addView(root, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        addView(hubRoot, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+
+        // The folder layer sits on top of the hub and is only revealed by the
+        // cross-zoom transition; it starts hidden at its zoomed-out scale.
+        folderPages.visibility = View.GONE
+        folderPages.alpha = 0f
+        folderPages.scaleX = FOLDER_LAYER_START_SCALE
+        folderPages.scaleY = FOLDER_LAYER_START_SCALE
+        folderPages.onBackRequested = { closeFolderPage() }
+        addView(folderPages, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
     }
 
     override fun onAttachedToWindow() {
@@ -317,6 +340,90 @@ class FolderHomeView @JvmOverloads constructor(
         // Consume everything not handled by children so touches never leak to the
         // workspace below.
         return true
+    }
+
+    override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
+        // While the two layers cross-animate, swallow touches so nothing lands
+        // on a half-faded layer.
+        return layerAnimator?.isRunning == true
+    }
+
+    /** Whether the folder layer is currently open over the hub. */
+    fun isInFolderMode(): Boolean {
+        return openFolderId != NO_FOLDER_ID
+    }
+
+    /**
+     * Returns from the folder layer to the hub with the zoom-out transition.
+     * Called by the folder layer's back button and by the launcher's
+     * back-press handler for the system back action.
+     */
+    fun closeFolderPage() {
+        if (!isInFolderMode()) return
+        openFolderId = NO_FOLDER_ID
+        // Bring the hub back on the page holding the folder last viewed.
+        val lastIndex = folderPages.currentFolderIndex
+        if (lastIndex >= 0) {
+            folderPager.goToPage(lastIndex / FOLDERS_PER_PAGE)
+        }
+        animateLayers(opening = false)
+    }
+
+    private fun animateLayers(opening: Boolean) {
+        val target = if (opening) 1f else 0f
+        layerAnimator?.cancel()
+        layerAnimator = null
+        if (layerFraction == target) {
+            applyLayerFraction(target)
+            settleLayers(target)
+            return
+        }
+        hubRoot.visibility = View.VISIBLE
+        folderPages.visibility = View.VISIBLE
+        val animator = ValueAnimator.ofFloat(layerFraction, target)
+        animator.duration =
+            (LAYER_TRANSITION_DURATION_MS * abs(target - layerFraction)).toLong()
+        animator.interpolator = LAYER_TRANSITION_INTERPOLATOR
+        animator.addUpdateListener { applyLayerFraction(it.animatedValue as Float) }
+        animator.addListener(object : AnimatorListenerAdapter() {
+            override fun onAnimationEnd(animation: Animator) {
+                if (layerAnimator === animation) {
+                    layerAnimator = null
+                    settleLayers(target)
+                }
+            }
+        })
+        layerAnimator = animator
+        animator.start()
+    }
+
+    private fun applyLayerFraction(fraction: Float) {
+        layerFraction = fraction
+        hubRoot.scaleX = 1f + HUB_LAYER_ZOOM * fraction
+        hubRoot.scaleY = 1f + HUB_LAYER_ZOOM * fraction
+        hubRoot.alpha = 1f - fraction
+        val folderScale = FOLDER_LAYER_START_SCALE + (1f - FOLDER_LAYER_START_SCALE) * fraction
+        folderPages.scaleX = folderScale
+        folderPages.scaleY = folderScale
+        folderPages.alpha = fraction
+    }
+
+    private fun settleLayers(fraction: Float) {
+        if (fraction >= 1f) {
+            hubRoot.visibility = View.GONE
+        } else if (fraction <= 0f) {
+            folderPages.visibility = View.GONE
+        }
+    }
+
+    /** Drops back to the hub with no transition, e.g. when the open folder disappears. */
+    private fun resetToHub() {
+        layerAnimator?.cancel()
+        layerAnimator = null
+        openFolderId = NO_FOLDER_ID
+        applyLayerFraction(0f)
+        hubRoot.visibility = View.VISIBLE
+        folderPages.visibility = View.GONE
     }
 
     private fun requestRefresh() {
@@ -355,6 +462,7 @@ class FolderHomeView @JvmOverloads constructor(
                     appCount = contents.size,
                     previewItems = contents.mapNotNull { it as? ItemInfoWithIcon }
                         .take(PREVIEW_ITEM_COUNT),
+                    apps = contents,
                     accentColor = ACCENT_COLORS[Math.floorMod(info.id, ACCENT_COLORS.size)],
                 )
             }
@@ -362,13 +470,24 @@ class FolderHomeView @JvmOverloads constructor(
     }
 
     private fun applyFolderEntries(entries: List<FolderEntry>) {
-        folderInfosById = entries.associate { it.info.id to it.info }
+        currentEntries = entries
         totalFolders = entries.size
         emptyLabel.visibility = if (entries.isEmpty()) View.VISIBLE else View.GONE
         val pages = entries.chunked(FOLDERS_PER_PAGE).map { pageEntries ->
             createFolderPage(pageEntries)
         }
         folderPager.setPages(pages, folderPager.currentPage)
+        folderPages.setFolders(entries)
+        if (isInFolderMode()) {
+            // Keep the folder layer on the same folder after a model change;
+            // if that folder is gone, fall back to the hub.
+            val openIndex = entries.indexOfFirst { it.info.id == openFolderId }
+            if (openIndex >= 0) {
+                folderPages.showFolder(openIndex)
+            } else {
+                resetToHub()
+            }
+        }
         updateHubHeader()
     }
 
@@ -497,19 +616,16 @@ class FolderHomeView @JvmOverloads constructor(
     }
 
     /**
-     * Opens a folder from its hub card.
-     *
-     * Provisional: replays the standard folder icon click so the stock folder
-     * popup is shown. A later unit replaces this with paged folder pages, which
-     * is why the lookup goes through the folder id only.
+     * Opens the folder layer on the folder with [folderId], cross-zooming from
+     * the hub. Does nothing when there is no such folder (in particular when
+     * there are no folders at all).
      */
     private fun openFolder(folderId: Int) {
-        val folderInfo = folderInfosById[folderId] ?: return
-        val launcher = Launcher.getLauncher(context)
-        val iconView = launcher.workspace.mapOverItems { info, view ->
-            view is FolderIcon && info?.id == folderInfo.id
-        } ?: return
-        ItemClickHandler.INSTANCE.onClick(iconView)
+        val index = currentEntries.indexOfFirst { it.info.id == folderId }
+        if (index < 0) return
+        openFolderId = folderId
+        folderPages.showFolder(index)
+        animateLayers(opening = true)
     }
 
     /** Refreshes the section header: space count, page dots and arrow states. */
@@ -629,16 +745,16 @@ class FolderHomeView @JvmOverloads constructor(
         ).toInt()
     }
 
-    private data class FolderEntry(
-        val info: FolderInfo,
-        val title: String,
-        val appCount: Int,
-        val previewItems: List<ItemInfoWithIcon>,
-        val accentColor: Int,
-    )
-
     companion object {
         private const val BACKGROUND_COLOR = 0xF220202A.toInt()
+
+        private const val NO_FOLDER_ID = -1
+        private const val LAYER_TRANSITION_DURATION_MS = 420L
+        private const val HUB_LAYER_ZOOM = 0.25f
+        private const val FOLDER_LAYER_START_SCALE = 0.82f
+
+        // cubic-bezier(0.22, 1, 0.36, 1), the prototype's layer easing.
+        private val LAYER_TRANSITION_INTERPOLATOR = PathInterpolator(0.22f, 1f, 0.36f, 1f)
 
         private const val HORIZONTAL_PADDING_DP = 20
         private const val TOP_PADDING_DP = 28

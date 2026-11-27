@@ -1112,4 +1112,7 @@
     <string name="folder_home_space_count">%1$d spaces</string>
     <string name="folder_home_prev_page">Previous page</string>
     <string name="folder_home_next_page">Next page</string>
+    <string name="folder_home_back_to_spaces">‹ Spaces</string>
+    <string name="folder_home_prev_folder">Previous folder</string>
+    <string name="folder_home_next_folder">Next folder</string>
 </resources>

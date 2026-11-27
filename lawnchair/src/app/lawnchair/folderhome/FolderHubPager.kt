@@ -67,6 +67,16 @@ class FolderHubPager @JvmOverloads constructor(
         snapToPage(target)
     }
 
+    /** Moves to [page] instantly, without the settle animation. */
+    fun jumpToPage(page: Int) {
+        val target = page.coerceIn(0, maxOf(0, childCount - 1))
+        setCurrentPage(target)
+        if (width > 0) {
+            scroller.forceFinished(true)
+            scrollTo(target * width, 0)
+        }
+    }
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
         val childWidth = MeasureSpec.makeMeasureSpec(measuredWidth, MeasureSpec.EXACTLY)

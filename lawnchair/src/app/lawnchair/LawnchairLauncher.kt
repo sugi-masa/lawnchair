@@ -74,6 +74,7 @@ import com.android.launcher3.uioverrides.states.AllAppsState
 import com.android.launcher3.uioverrides.states.BackgroundAppState
 import com.android.launcher3.uioverrides.states.OverviewState
 import com.android.launcher3.util.ActivityOptionsWrapper
+import com.android.launcher3.util.BackPressHandler
 import com.android.launcher3.util.Executors
 import com.android.launcher3.util.RunnableList
 import com.android.launcher3.util.SystemUiController.UI_STATE_BASE_WINDOW
@@ -252,6 +253,23 @@ class LawnchairLauncher : QuickstepLauncher() {
         reloadIconsIfNeeded()
 
         AppDatabase.INSTANCE.get(this).checkpointSync()
+
+        // While a folder page is open inside the folder home layer, the system
+        // back action returns to the hub instead of leaving the layer. This
+        // plugs into the launcher's own back-handler chain, ahead of the state
+        // handler, the same way split selection registers its handler.
+        if (Utilities.ATLEAST_U) {
+            addBackAnimationCallback(
+                object : BackPressHandler {
+                    override fun canHandleBack(): Boolean = stateManager.state == LauncherState.FOLDER_HOME &&
+                        getFolderHomeView().isInFolderMode()
+
+                    override fun onBackInvoked() {
+                        getFolderHomeView().closeFolderPage()
+                    }
+                },
+            )
+        }
 
         // Folder home is the top layer shown when the launcher starts. The state
         // manager itself keeps NORMAL as its base state; we move to FOLDER_HOME

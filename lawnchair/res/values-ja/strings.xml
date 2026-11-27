@@ -28,4 +28,7 @@
     <string name="folder_home_space_count">%1$d 空間</string>
     <string name="folder_home_prev_page">前のページ</string>
     <string name="folder_home_next_page">次のページ</string>
+    <string name="folder_home_back_to_spaces">‹ 空間一覧</string>
+    <string name="folder_home_prev_folder">前のフォルダ</string>
+    <string name="folder_home_next_folder">次のフォルダ</string>
 </resources>
