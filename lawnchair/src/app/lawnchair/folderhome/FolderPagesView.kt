@@ -21,7 +21,7 @@ import com.android.launcher3.model.data.ItemInfoWithIcon
 import com.android.launcher3.touch.ItemClickHandler
 
 /** Display-ready snapshot of one folder, shared by the hub cards and the folder pages. */
-internal data class FolderEntry(
+data class FolderEntry(
     val info: FolderInfo,
     val title: String,
     val appCount: Int,
