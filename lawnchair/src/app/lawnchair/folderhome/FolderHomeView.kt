@@ -168,12 +168,14 @@ class FolderHomeView @JvmOverloads constructor(
                 topMargin = dp(DATE_MARGIN_TOP_DP)
             },
         )
+        // The card sizes to its content instead of filling the zone, so the
+        // widget zone stays compact and the folder section gets the rest of
+        // the screen.
         widgetZone.addView(
             widgetCard,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                0,
-                1f,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
             ).apply {
                 topMargin = dp(HEADER_MARGIN_TOP_DP)
             },
@@ -182,8 +184,7 @@ class FolderHomeView @JvmOverloads constructor(
             widgetZone,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                0,
-                WIDGET_ZONE_WEIGHT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
             ),
         )
 
@@ -376,7 +377,11 @@ class FolderHomeView @JvmOverloads constructor(
             columnCount = GRID_COLUMNS
             rowCount = GRID_ROWS
         }
-        entries.forEachIndexed { index, entry ->
+        // Every cell of the 2 x 3 grid is always added, with an empty spacer
+        // where the page has no folder. GridLayout only distributes its extra
+        // space over rows and columns that hold a weighted child, so without
+        // the spacers a lone card would stretch over the whole page.
+        for (index in 0 until FOLDERS_PER_PAGE) {
             val params = GridLayout.LayoutParams(
                 GridLayout.spec(index / GRID_COLUMNS, GridLayout.FILL, 1f),
                 GridLayout.spec(index % GRID_COLUMNS, GridLayout.FILL, 1f),
@@ -386,7 +391,12 @@ class FolderHomeView @JvmOverloads constructor(
                 val margin = dp(CARD_MARGIN_DP)
                 setMargins(margin, margin, margin, margin)
             }
-            grid.addView(createFolderCard(entry), params)
+            val cell = if (index < entries.size) {
+                createFolderCard(entries[index])
+            } else {
+                View(context)
+            }
+            grid.addView(cell, params)
         }
         return grid
     }
@@ -634,8 +644,7 @@ class FolderHomeView @JvmOverloads constructor(
         private const val TOP_PADDING_DP = 28
         private const val BOTTOM_PADDING_DP = 20
         private const val ZONE_GAP_DP = 16
-        private const val WIDGET_ZONE_WEIGHT = 1f
-        private const val FOLDER_ZONE_WEIGHT = 1.3f
+        private const val FOLDER_ZONE_WEIGHT = 1f
 
         private const val GRID_COLUMNS = 2
         private const val GRID_ROWS = 3

@@ -15,6 +15,7 @@
  */
 package com.android.launcher3.uioverrides.states;
 
+import static com.android.app.animation.Interpolators.DECELERATE_2;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_HOME;
 
 import com.android.launcher3.Launcher;
@@ -43,5 +44,17 @@ public class FolderHomeState extends LauncherState {
     @Override
     public int getVisibleElements(Launcher launcher) {
         return NONE;
+    }
+
+    @Override
+    public PageAlphaProvider getWorkspacePageAlphaProvider(Launcher launcher) {
+        // Mirror of the quickstep variant: keep the workspace pages' contents
+        // from showing through the translucent folder home layer.
+        return new PageAlphaProvider(DECELERATE_2) {
+            @Override
+            public float getPageAlpha(int pageIndex) {
+                return 0;
+            }
+        };
     }
 }

@@ -15,6 +15,7 @@
  */
 package com.android.launcher3.uioverrides.states;
 
+import static com.android.app.animation.Interpolators.DECELERATE_2;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_HOME;
 
 import com.android.launcher3.Launcher;
@@ -49,5 +50,19 @@ public class FolderHomeState extends LauncherState {
         // The folder home layer covers the whole screen, so no workspace element
         // (hotseat icons, page indicator, floating search bar) should be shown.
         return NONE;
+    }
+
+    @Override
+    public PageAlphaProvider getWorkspacePageAlphaProvider(Launcher launcher) {
+        // The folder home layer is translucent, so the contents of the workspace
+        // pages underneath (icons, widgets, first-run text) must not show through
+        // it. Fading every page out here only touches the pages' contents; the
+        // wallpaper is drawn behind the launcher window and stays visible.
+        return new PageAlphaProvider(DECELERATE_2) {
+            @Override
+            public float getPageAlpha(int pageIndex) {
+                return 0;
+            }
+        };
     }
 }
