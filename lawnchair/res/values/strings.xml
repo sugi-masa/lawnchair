@@ -1107,4 +1107,9 @@
         <item quantity="one">%1$d app</item>
         <item quantity="other">%1$d apps</item>
     </plurals>
+    <string name="folder_home_widgets_label">WIDGETS &amp; STATUS</string>
+    <string name="folder_home_hub_title">My Folder Spaces</string>
+    <string name="folder_home_space_count">%1$d spaces</string>
+    <string name="folder_home_prev_page">Previous page</string>
+    <string name="folder_home_next_page">Next page</string>
 </resources>

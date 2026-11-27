@@ -38,16 +38,33 @@ class FolderHubPager @JvmOverloads constructor(
     var currentPage = 0
         private set
 
+    /** Number of pages currently held by the pager. */
+    val pageCount: Int
+        get() = childCount
+
+    /** Called with the new page index whenever the settled page changes. */
+    var onPageChangeListener: ((Int) -> Unit)? = null
+
     /** Replaces all pages, keeping the visible page as close as possible to [page]. */
     fun setPages(pages: List<View>, page: Int) {
         removeAllViews()
         pages.forEach { addView(it) }
-        currentPage = page.coerceIn(0, maxOf(0, pages.size - 1))
+        setCurrentPage(page.coerceIn(0, maxOf(0, pages.size - 1)))
         if (width > 0) {
             scroller.forceFinished(true)
             scrollTo(currentPage * width, 0)
         }
         requestLayout()
+    }
+
+    /** Moves to [page] with the usual settle animation, if that page exists. */
+    fun goToPage(page: Int) {
+        val target = page.coerceIn(0, maxOf(0, childCount - 1))
+        if (width == 0) {
+            setCurrentPage(target)
+            return
+        }
+        snapToPage(target)
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -184,12 +201,18 @@ class FolderHubPager @JvmOverloads constructor(
         val pageWidth = width
         if (pageWidth == 0) return
         val target = page.coerceIn(0, maxOf(0, childCount - 1))
-        currentPage = target
+        setCurrentPage(target)
         val targetX = target * pageWidth
         if (scrollX != targetX) {
             scroller.startScroll(scrollX, 0, targetX - scrollX, 0, SETTLE_DURATION_MS)
             postInvalidateOnAnimation()
         }
+    }
+
+    private fun setCurrentPage(page: Int) {
+        if (currentPage == page) return
+        currentPage = page
+        onPageChangeListener?.invoke(page)
     }
 
     private fun obtainVelocityTracker(event: MotionEvent) {
