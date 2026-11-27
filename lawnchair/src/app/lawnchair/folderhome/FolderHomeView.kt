@@ -207,7 +207,7 @@ class FolderHomeView @JvmOverloads constructor(
     }
 
     private fun applyFolderEntries(entries: List<FolderEntry>) {
-        folderInfosById = entries.associateBy { it.info.id }
+        folderInfosById = entries.associate { it.info.id to it.info }
         emptyLabel.visibility = if (entries.isEmpty()) View.VISIBLE else View.GONE
         val pages = entries.chunked(FOLDERS_PER_PAGE).map { pageEntries ->
             createFolderPage(pageEntries)
