@@ -2140,10 +2140,10 @@ public class Launcher extends StatefulActivity<LauncherState>
         // Reset AllApps to its initial state only if we are not in the middle of
         // processing a multi-step drop
         if (!isOn && mPendingRequestArgs == null) {
-            if (!isInState(NORMAL)) {
+            if (!isInState(FOLDER_HOME)) {
                 onUiChangedWhileSleeping();
             }
-            mStateManager.goToState(NORMAL);
+            mStateManager.goToState(FOLDER_HOME);
         }
     }
 

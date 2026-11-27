@@ -23,6 +23,7 @@ import static com.android.app.animation.Interpolators.FINAL_FRAME;
 import static com.android.app.animation.Interpolators.INSTANT;
 import static com.android.app.animation.Interpolators.LINEAR;
 import static com.android.launcher3.LauncherState.ALL_APPS;
+import static com.android.launcher3.LauncherState.FOLDER_HOME;
 import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_ALL_APPS_FADE;
 import static com.android.launcher3.states.StateAnimationConfig.ANIM_DEPTH;
@@ -151,7 +152,8 @@ public class AllAppsSwipeController extends AbstractStateChangeTouchController {
         if (AbstractFloatingView.getTopOpenView(mLauncher) != null) {
             return false;
         }
-        if (!mLauncher.isInState(NORMAL) && !mLauncher.isInState(ALL_APPS)) {
+        if (!mLauncher.isInState(NORMAL) && !mLauncher.isInState(ALL_APPS)
+                && !mLauncher.isInState(FOLDER_HOME)) {
             // Don't listen for the swipe gesture if we are already in some other state.
             return false;
         }
@@ -163,10 +165,13 @@ public class AllAppsSwipeController extends AbstractStateChangeTouchController {
 
     @Override
     protected LauncherState getTargetState(LauncherState fromState, boolean isDragTowardPositive) {
-        if (fromState == NORMAL && shouldOpenAllApps(isDragTowardPositive)) {
+        if ((fromState == NORMAL || fromState == FOLDER_HOME)
+                && shouldOpenAllApps(isDragTowardPositive)) {
             return ALL_APPS;
         } else if (fromState == ALL_APPS && !isDragTowardPositive) {
-            return NORMAL;
+            // The folder home (space hub) is the only home surface, so All Apps
+            // always closes back into it.
+            return FOLDER_HOME;
         }
         return fromState;
     }
@@ -190,9 +195,9 @@ public class AllAppsSwipeController extends AbstractStateChangeTouchController {
             LauncherState toState) {
         StateAnimationConfig config = super.getConfigForStates(fromState, toState);
         config.animProps |= StateAnimationConfig.USER_CONTROLLED;
-        if (fromState == NORMAL && toState == ALL_APPS) {
+        if ((fromState == NORMAL || fromState == FOLDER_HOME) && toState == ALL_APPS) {
             applyNormalToAllAppsAnimConfig(mLauncher, config);
-        } else if (fromState == ALL_APPS && toState == NORMAL) {
+        } else if (fromState == ALL_APPS && (toState == NORMAL || toState == FOLDER_HOME)) {
             applyAllAppsToNormalConfig(mLauncher, config);
         }
         return config;

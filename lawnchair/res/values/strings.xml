@@ -1100,5 +1100,11 @@
     <string name="please_wait">Please wait…</string>
 
     <string name="folder_home_title">Folder Home</string>
-    <string name="folder_home_swipe_down_hint">Swipe down to go to the home screen</string>
+    <string name="folder_home_widget_zone">Widgets</string>
+    <string name="folder_home_no_folders">No folders yet</string>
+    <string name="folder_home_unnamed_folder">Folder</string>
+    <plurals name="folder_home_app_count">
+        <item quantity="one">%1$d app</item>
+        <item quantity="other">%1$d apps</item>
+    </plurals>
 </resources>
